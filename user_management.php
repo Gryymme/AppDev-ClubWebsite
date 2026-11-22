@@ -146,7 +146,7 @@ $isAdmin = ($username === 'admin' && $email === 'admin@email.com');
                                                 <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#eventInfoModal<?php echo htmlspecialchars($event['event_id']); ?>">
                                                     EVENT INFO
                                                 </button>
-                                                <button type="button" class="btn btn-danger btn-sm cancel-ticket-btn" data-eventid="<?php echo htmlspecialchars($event['event_id']); ?>">
+                                                <button type="submit" class="btn btn-danger btn-sm" form="cancel-ticket-<?= (int)$event['event_id'] ?>">
                                                     CANCEL TICKET
                                                 </button>
                                             </div>
@@ -180,11 +180,10 @@ $isAdmin = ($username === 'admin' && $email === 'admin@email.com');
         </div>
     </div>
 
-    <form id="deleteTicketForm" action="process_delete_ticket.php" method="POST" style="display: none;">
-        <input type="hidden" id="eventIdToDelete" name="event_id_to_delete" value="">
-    </form>
-
     <?php foreach ($signed_up_events as $event): ?>
+    <form id="cancel-ticket-<?= (int)$event['event_id'] ?>" action="process_delete_ticket.php" method="POST" onsubmit="return confirm('You are about to cancel your reserved ticket. Click OK to proceed.');">
+        <input type="hidden" name="event_id_to_delete" value="<?= (int)$event['event_id'] ?>">
+    </form>
     <div class="modal fade" id="eventInfoModal<?php echo htmlspecialchars($event['event_id']); ?>" tabindex="-1" aria-labelledby="eventInfoModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-centered">
             <div class="modal-content">
@@ -222,21 +221,5 @@ $isAdmin = ($username === 'admin' && $email === 'admin@email.com');
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
 
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const cancelButtons = document.querySelectorAll('.cancel-ticket-btn');
-        cancelButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                if (confirm('You are about to cancel your reserved ticket. Click OK to proceed.')) {
-                    const eventId = this.getAttribute('data-eventid');
-                    const deleteForm = document.getElementById('deleteTicketForm');
-                    const eventIdInput = document.getElementById('eventIdToDelete');
-                    eventIdInput.value = eventId;
-                    deleteForm.submit();
-                }
-            });
-        });
-    });
-    </script>
 </body>
 </html>

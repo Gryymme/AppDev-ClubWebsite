@@ -2,7 +2,10 @@
 session_start();
 date_default_timezone_set('Asia/Manila');
 
-require_once 'database/db_connection.php'; 
+require_once 'database/db_connection.php';
+require_once __DIR__ . '/membership.php';
+$plans = membershipPlans();
+$paymentFields = paymentFieldRules();
 
 // Redirect if user is not logged in
 if (!isset($_SESSION['username']) || !isset($_SESSION['user_id'])) {
@@ -50,76 +53,13 @@ unset($_SESSION['payment_error_messages']); // Clear them after display
 
 // Handle form submission for membership
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $selectedPlan = $_POST['selected_plan'] ?? null;
-    $paymentMethod = $_POST['paymentMethod'] ?? null;
-    $isValid = true;
-    $validationErrors = [];
-
-    // Basic validation for selected plan
-    if (!in_array($selectedPlan, ['monthly', 'annual'])) {
-        $validationErrors[] = "Please select a membership plan.";
-        $isValid = false;
-    }
-
-    // Basic validation for payment method
-    if (!in_array($paymentMethod, ['credit_debit', 'gcash'])) {
-        $validationErrors[] = "Please select a valid payment method.";
-        $isValid = false;
-    }
-
-    $amount = 0;
-    $endDate = null;
-    $startDate = date('Y-m-d'); // Payment date
-
-    if ($selectedPlan === 'monthly') {
-        $amount = 20;
-        $endDate = date('Y-m-d', strtotime('+1 month'));
-    } elseif ($selectedPlan === 'annual') {
-        $amount = 200;
-        $endDate = date('Y-m-d', strtotime('+1 year'));
-    }
-
-    // Validate payment details based on method
-    if ($paymentMethod === 'credit_debit') {
-        $cardName = trim($_POST['cardName'] ?? '');
-        $cardNumber = trim(str_replace(' ', '', $_POST['cardNumber'] ?? ''));
-        $expiryDate = trim($_POST['expiryDate'] ?? '');
-        $cvv = trim($_POST['cvv'] ?? '');
-
-        if (empty($cardName) || !preg_match('/^[a-zA-Z\s.-]+$/', $cardName)) {
-            $validationErrors[] = "Card Name must contain only letters, spaces, hyphens, and periods.";
-            $isValid = false;
-        }
-        if (strlen($cardNumber) < 13 || strlen($cardNumber) > 19 || !ctype_digit($cardNumber)) {
-            $validationErrors[] = "Invalid Card Number length (13-19 digits) or characters.";
-            $isValid = false;
-        }
-        if (!preg_match('/^(0[1-9]|1[0-2])\/?([0-9]{2})$/', $expiryDate, $matches)) {
-            $validationErrors[] = "Invalid Expiry Date format (MM/YY).";
-            $isValid = false;
-        } else {
-            $expMonth = (int)$matches[1];
-            $expYear = (int)$matches[2];
-            $currentYear = (int)date('y');
-            $currentMonth = (int)date('m');
-
-            if ($expYear < $currentYear || ($expYear === $currentYear && $expMonth < $currentMonth)) {
-                $validationErrors[] = "Credit Card has expired.";
-                $isValid = false;
-            }
-        }
-        if (!ctype_digit($cvv) || (strlen($cvv) !== 3 && strlen($cvv) !== 4)) {
-            $validationErrors[] = "CVV must be 3 or 4 digits.";
-            $isValid = false;
-        }
-
-    } elseif ($paymentMethod === 'gcash') {
-        $mobileNumber = trim($_POST['gcashPhoneNumber'] ?? '');
-        if (!ctype_digit($mobileNumber) || (strlen($mobileNumber) !== 10 && strlen($mobileNumber) !== 11)) {
-            $validationErrors[] = "Mobile Number must be 10 or 11 digits (numerical only).";
-            $isValid = false;
-        }
-    }
+    $selectedPlan = paymentScalar($_POST, 'selected_plan');
+    $paymentMethod = paymentScalar($_POST, 'paymentMethod');
+    $validationErrors = validateMembershipPayment($_POST);
+    $isValid = empty($validationErrors);
+    $startDate = date('Y-m-d');
+    $amount = $plans[$selectedPlan]['amount'] ?? 0;
+    $endDate = isset($plans[$selectedPlan]) ? date('Y-m-d', strtotime($plans[$selectedPlan]['duration'])) : null;
 
     if ($isValid) {
         // Generate a unique transaction ID
@@ -182,9 +122,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
     } else {
-        $_SESSION['payment_error_messages'] = $validationErrors;
+        $paymentErrorMessages = $validationErrors;
     }
 }
+$chosenPlan = paymentScalar($_POST, 'selected_plan');
+$chosenMethod = paymentScalar($_POST, 'paymentMethod');
 ?>
 <!DOCTYPE html>
 <html>
@@ -257,79 +199,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <?php endif; ?>
 
                 <form id="membershipForm" method="POST">
-                    <input type="hidden" id="selected_plan" name="selected_plan" value="">
+                    <input type="hidden" id="selected_plan" name="selected_plan" value="<?= isset($plans[$chosenPlan]) ? htmlspecialchars($chosenPlan) : '' ?>">
 
                     <div class="membership-options-container">
-                        <div class="membership-plan" id="monthlyPlan">
+                        <?php foreach ($plans as $planId => $plan): ?>
+                        <div class="membership-plan" id="<?= htmlspecialchars($planId) ?>Plan">
                             <div>
-                                <h2>P 20</h2>
-                                <p>Monthly Billing</p>
+                                <h2>P <?= (int)$plan['amount'] ?></h2>
+                                <p><?= htmlspecialchars($plan['billing']) ?></p>
                                 <ul class="features">
-                                    <li>First month free</li>
-                                    <li>Access to Club Newsletter</li>
-                                    <li>Access to Exclusive Events</li>
+                                    <?php foreach ($plan['features'] as $feature): ?>
+                                    <li><?= htmlspecialchars($feature) ?></li>
+                                    <?php endforeach; ?>
                                 </ul>
                             </div>
-                            <button type="button" class="select-button" data-plan="monthly" onclick="selectMembershipPlan('monthly')">Select</button>
+                            <button type="button" class="select-button<?= $chosenPlan === $planId ? ' selected' : '' ?>" data-plan="<?= htmlspecialchars($planId) ?>" aria-pressed="<?= $chosenPlan === $planId ? 'true' : 'false' ?>">Select</button>
                         </div>
-
-                        <div class="membership-plan" id="annualPlan">
-                            <div>
-                                <h2>P 200</h2>
-                                <p>Annual Billing</p>
-                                <ul class="features">
-                                    <li>Access to Club Newsletter</li>
-                                    <li>Access to Exclusive Events</li>
-                                </ul>
-                            </div>
-                            <button type="button" class="select-button" data-plan="annual" onclick="selectMembershipPlan('annual')">Select</button>
-                        </div>
+                        <?php endforeach; ?>
                     </div>
 
                     <h2 style="margin-top: 40px; text-align: center;">Payment Options</h2>
                     <div class="input-group">
                         <label for="paymentMethod">Select Payment Method:</label>
-                        <select id="paymentMethod" name="paymentMethod" onchange="togglePaymentFields(); validateForm()">
+                        <select id="paymentMethod" name="paymentMethod" required>
                             <option value="">-- Select --</option>
-                            <option value="credit_debit">Credit/Debit Card</option>
-                            <option value="gcash">GCash</option>
+                            <option value="credit_debit" <?= $chosenMethod === 'credit_debit' ? 'selected' : '' ?>>Credit/Debit Card</option>
+                            <option value="gcash" <?= $chosenMethod === 'gcash' ? 'selected' : '' ?>>GCash</option>
                         </select>
                         <div id="paymentMethodError" class="error-message"></div>
                     </div>
 
-                    <div id="creditCardDetails" style="display: none;">
+                    <div id="creditCardDetails" data-payment-method="credit_debit" style="display: none;">
                         <div class="input-group">
                             <label for="cardName">Card Name:</label>
-                            <input type="text" id="cardName" name="cardName" placeholder="Name on Card" oninput="this.value = this.value.replace(/[^a-zA-Z\s.-]/g, ''); validateCardName(); validateForm()">
-                            <div id="cardNameError" class="error-message"></div>
+                            <input <?= paymentInputAttributes('cardName', $paymentFields['credit_debit']['cardName']) ?> placeholder="Name on Card">
+                            <div id="cardNameError" class="error-message" aria-live="polite"></div>
                         </div>
                         <div class="input-group">
                             <label for="cardNumber">Card Number:</label>
-                            <input type="text" id="cardNumber" name="cardNumber" placeholder="Enter card number" pattern="[0-9]*" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, ''); validateCardNumber(); validateForm()" maxlength="19">
-                            <div id="cardNumberError" class="error-message"></div>
+                            <input <?= paymentInputAttributes('cardNumber', $paymentFields['credit_debit']['cardNumber']) ?> placeholder="Enter card number" inputmode="numeric">
+                            <div id="cardNumberError" class="error-message" aria-live="polite"></div>
                         </div>
                         <div class="card-details-row" style="display:flex; gap:15px;">
                             <div class="input-group" style="flex:1;">
                                 <label for="expiryDate">Expiry Date (MM/YY):</label>
-                                <input type="text" id="expiryDate" name="expiryDate" placeholder="MM/YY" pattern="[0-9/]*" inputmode="numeric" oninput="formatAndValidateExpiryDate(this); validateForm()" maxlength="5">
-                                <div id="expiryDateError" class="error-message"></div>
+                                <input <?= paymentInputAttributes('expiryDate', $paymentFields['credit_debit']['expiryDate']) ?> placeholder="MM/YY" inputmode="numeric">
+                                <div id="expiryDateError" class="error-message" aria-live="polite"></div>
                             </div>
                             <div class="input-group" style="flex:1;">
                                 <label for="cvv">CVV:</label>
-                                <input type="text" id="cvv" name="cvv" placeholder="CVV" pattern="[0-9]*" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 4); validateCVV(); validateForm()" maxlength="4">
-                                <div id="cvvError" class="error-message"></div>
+                                <input <?= paymentInputAttributes('cvv', $paymentFields['credit_debit']['cvv']) ?> placeholder="CVV" inputmode="numeric">
+                                <div id="cvvError" class="error-message" aria-live="polite"></div>
                             </div>
                         </div>
                     </div>
 
-                    <div id="gcashDetails" style="display: none;">
+                    <div id="gcashDetails" data-payment-method="gcash" style="display: none;">
                         <div class="input-group">
                             <label for="gcashPhoneNumber">Mobile Number:</label>
                             <div class="gcash-mobile-input-group">
                                 <span>+63</span>
-                                <input type="text" id="gcashPhoneNumber" name="gcashPhoneNumber" placeholder="e.g., 9171234567" pattern="[0-9]*" inputmode="tel" oninput="this.value = this.value.replace(/[^0-9]/g, ''); validateGCashPhoneNumber(); validateForm()" maxlength="11">
+                                <input <?= paymentInputAttributes('gcashPhoneNumber', $paymentFields['gcash']['gcashPhoneNumber']) ?> placeholder="e.g., 9171234567" inputmode="tel">
                             </div>
-                            <div id="gcashPhoneNumberError" class="error-message"></div>
+                            <div id="gcashPhoneNumberError" class="error-message" aria-live="polite"></div>
                         </div>
                     </div>
 
@@ -346,260 +278,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <?php include 'footer.php'; ?>
 
-    <script>
-        let selectedPlan = null; // Store the selected plan type
-
-        document.addEventListener('DOMContentLoaded', function() {
-            // Restore selected plan from hidden input if form was submitted with errors
-            const hiddenPlanInput = document.getElementById('selected_plan');
-            if (hiddenPlanInput.value) {
-                selectedPlan = hiddenPlanInput.value;
-                const selectedButton = document.querySelector(`.select-button[data-plan="${selectedPlan}"]`);
-                if (selectedButton) {
-                    selectedButton.classList.add('selected');
-                }
-            }
-
-            togglePaymentFields(); // Initialize visibility on page load
-            validateForm(); // Initial validation for button state
-        });
-
-        function selectMembershipPlan(planType) {
-            selectedPlan = planType;
-
-            // Remove 'selected' class from all buttons
-            document.querySelectorAll('.select-button').forEach(button => {
-                button.classList.remove('selected');
-            });
-
-            // Add 'selected' class to the clicked button
-            const selectedButton = document.querySelector(`.select-button[data-plan="${planType}"]`);
-            if (selectedButton) {
-                selectedButton.classList.add('selected');
-            }
-
-            // Update the hidden input field for form submission
-            document.getElementById('selected_plan').value = planType;
-
-            validateForm(); // Re-validate form state after selecting plan
-        }
-
-        function togglePaymentFields() {
-            const paymentMethod = document.getElementById('paymentMethod').value;
-            const creditCardDetails = document.getElementById('creditCardDetails');
-            const gcashDetails = document.getElementById('gcashDetails');
-
-            // Hide all payment details first
-            creditCardDetails.style.display = 'none';
-            gcashDetails.style.display = 'none';
-
-            // Clear previous error messages when switching payment methods
-            clearAllErrors();
-            clearPaymentFields(); // Clear values when switching
-
-            // Show relevant fields based on selection
-            if (paymentMethod === 'credit_debit') {
-                creditCardDetails.style.display = 'block';
-            } else if (paymentMethod === 'gcash') {
-                gcashDetails.style.display = 'block';
-            }
-            validateForm(); // Re-validate form state after changing payment method
-        }
-
-        function clearPaymentFields() {
-            // Clear Credit Card fields
-            document.getElementById('cardName').value = '';
-            document.getElementById('cardNumber').value = '';
-            document.getElementById('expiryDate').value = '';
-            document.getElementById('cvv').value = '';
-
-            // Clear GCash field
-            document.getElementById('gcashPhoneNumber').value = '';
-        }
-
-        function clearError(elementId) {
-            const errorElement = document.getElementById(elementId);
-            if (errorElement) {
-                errorElement.textContent = '';
-            }
-        }
-
-        function displayError(elementId, message) {
-            const errorElement = document.getElementById(elementId);
-            if (errorElement) {
-                errorElement.textContent = message;
-            }
-        }
-
-        function clearAllErrors() {
-            const errorElements = document.querySelectorAll('.error-message');
-            errorElements.forEach(el => el.textContent = '');
-        }
-
-        // Validation functions (return true if valid, false if invalid)
-        function validateCardName() {
-            const cardNameInput = document.getElementById('cardName');
-            const cardName = cardNameInput.value.trim();
-            clearError('cardNameError');
-            if (cardName.length === 0) {
-                displayError('cardNameError', 'Card Name is required.');
-                return false;
-            }
-            if (!/^[a-zA-Z\s.-]+$/.test(cardName)) {
-                displayError('cardNameError', 'Card Name can only contain letters, spaces, hyphens, and periods.');
-                return false;
-            }
-            return true;
-        }
-
-        function validateCardNumber() {
-            const cardNumberInput = document.getElementById('cardNumber');
-            const cardNumber = cardNumberInput.value.replace(/\s/g, ''); // Remove spaces
-            clearError('cardNumberError');
-
-            if (cardNumber.length === 0) {
-                displayError('cardNumberError', 'Card Number is required.');
-                return false;
-            }
-            if (cardNumber.length < 13 || cardNumber.length > 19 || !/^\d+$/.test(cardNumber)) {
-                displayError('cardNumberError', 'Invalid card number length (13-19 digits).');
-                return false;
-            }
-            return true;
-        }
-
-        function formatAndValidateExpiryDate(input) {
-            let value = input.value.replace(/\D/g, ''); // Remove non-digits
-            clearError('expiryDateError');
-
-            if (value.length > 2) {
-                value = value.substring(0, 2) + '/' + value.substring(2, 4);
-            }
-            input.value = value;
-
-            if (value.length === 5) { // MM/YY
-                const [monthStr, yearStr] = value.split('/');
-                const month = parseInt(monthStr, 10);
-                const year = 2000 + parseInt(yearStr, 10); // Assume 20xx for YY
-
-                if (isNaN(month) || isNaN(year) || month < 1 || month > 12) {
-                    displayError('expiryDateError', 'Invalid month (MM).');
-                    return false;
-                }
-
-                const today = new Date();
-                const currentYear = today.getFullYear();
-                const currentMonth = today.getMonth() + 1; 
-
-                if (year < currentYear || (year === currentYear && month < currentMonth)) {
-                    displayError('expiryDateError', 'Expired date.');
-                    return false;
-                }
-                return true;
-            } else if (value.length > 0 && value.length < 5) {
-                return false; 
-            } else if (value.length === 0) {
-                displayError('expiryDateError', 'Expiry Date is required.');
-                return false;
-            }
-            return false;
-        }
-
-        function validateCVV() {
-            const cvvInput = document.getElementById('cvv');
-            const cvv = cvvInput.value;
-            clearError('cvvError');
-
-            if (cvv.length === 0) {
-                displayError('cvvError', 'CVV is required.');
-                return false;
-            }
-            if (!/^\d{3,4}$/.test(cvv)) {
-                displayError('cvvError', 'CVV must be 3 or 4 digits.');
-                return false;
-            }
-            return true;
-        }
-
-        function validateGCashPhoneNumber() {
-            const phoneNumberInput = document.getElementById('gcashPhoneNumber');
-            const phoneNumber = phoneNumberInput.value;
-            clearError('gcashPhoneNumberError');
-
-            if (phoneNumber.length === 0) {
-                displayError('gcashPhoneNumberError', 'Mobile Number is required.');
-                return false;
-            }
-            if (!/^\d{10,11}$/.test(phoneNumber)) {
-                displayError('gcashPhoneNumberError', 'Phone number must be 10 or 11 digits.');
-                return false;
-            }
-            return true;
-        }
-
-        // Master validation function to enable/disable Pay Now button
-        function validateForm() {
-            const payNowButton = document.getElementById('payNowButton');
-            let formIsValid = true;
-
-            // Check if a plan is selected
-            if (!selectedPlan) {
-                formIsValid = false;
-            }
-
-            // Check if payment method is selected
-            const paymentMethod = document.getElementById('paymentMethod').value;
-            if (paymentMethod === '') {
-                formIsValid = false;
-            }
-
-            // Validate specific payment fields based on selected method
-            if (paymentMethod === 'credit_debit') {
-                if (!(validateCardName() && validateCardNumber() && formatAndValidateExpiryDate(document.getElementById('expiryDate')) && validateCVV())) {
-                    formIsValid = false;
-                }
-            } else if (paymentMethod === 'gcash') {
-                if (!validateGCashPhoneNumber()) {
-                    formIsValid = false;
-                }
-            }
-
-            payNowButton.disabled = !formIsValid;
-        }
-
-        // Attach validateForm to all relevant input events 
-        document.querySelectorAll('#membershipForm input, #membershipForm select').forEach(element => {
-            if (element.id !== 'payNowButton' && element.id !== 'selected_plan') {
-                element.addEventListener('input', validateForm);
-                element.addEventListener('change', validateForm);
-            }
-        });
-
-        // Add an event listener to the form to handle submission with loading animation
-        document.getElementById('membershipForm').addEventListener('submit', function(event) {
-            // Prevent the form from submitting immediately
-            event.preventDefault();
-
-            // Run final validation
-            validateForm();
-
-            const payNowButton = document.getElementById('payNowButton');
-            const form = this; // 'this' refers to the form element
-
-            // Check if the form is valid (i.e., the button is not disabled)
-            if (!payNowButton.disabled) {
-                // Add the loading class to the button
-                payNowButton.classList.add('button--loading');
-                // Disable the button to prevent multiple clicks
-                payNowButton.disabled = true;
-
-                // Set a timeout for 3 seconds (3000 milliseconds)
-                setTimeout(function() {
-                    // After 3 seconds, submit the form programmatically
-                    form.submit();
-                }, 3000);
-            }
-        });
-    </script>
+    <script src="js/payment.js" defer></script>
 </body>
 </html>

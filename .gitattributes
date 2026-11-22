@@ -1,0 +1,5 @@
+# Retained upstream DataTables 2.3.2 distributions (not application code).
+/js/datatables.min.js linguist-vendored
+/css/datatables.min.css linguist-vendored
+# Start Bootstrap Agency v7.0.12, with only the local header image extension adapted.
+/css/styles.css linguist-vendored
