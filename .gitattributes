@@ -1,1 +1,1 @@
-printf "*.js linguist-detectable=false\n" > .gitattributes
+*.js linguist-detectable=false
