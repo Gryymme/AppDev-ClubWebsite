@@ -1,0 +1,672 @@
+/* -------------------------------------------------------------------------- */
+/* BASE LAYOUT & STICKY FOOTER
+    Ensures header, main content, and footer are correctly positioned
+    and footer sticks to the bottom of the viewport when content is short.    */
+/* -------------------------------------------------------------------------- */
+html, body {
+    height: 100%; 
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box; 
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-image: url("../assets/img/header-bg.png");
+    background-size: cover;          /* Ensures image covers entire body */
+    background-position: center;     /* Center the image */
+    background-repeat: repeat-y;     /* Repeat vertically when content is longer */
+    display: flex; /* Make body a flex container */
+    flex-direction: column; /* Stack navbar, page-wrapper, footer vertically */
+    min-height: 100vh; /* Ensure body covers at least the viewport height */
+}
+
+/* Main content area that expands to fill available space
+    between the navigation bar and the footer. */
+.page-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding-top: 80px; /* Example: If your navbar is 80px tall */
+    padding-bottom: 20px; 
+    padding-left: 0; 
+    padding-right: 0; 
+    min-height: auto;
+    box-sizing: border-box;
+}
+
+/* main-content acts as a wrapper for the login-container, handling its centering */
+.main-content {
+    display: flex; /* Keeps it as flex to center its child (login-container) */
+    justify-content: center; /* Center horizontally */
+    align-items: center; /* Center vertically */
+    width: 100%; /* Ensures it spans full width of page-wrapper */
+    padding: 0; /* Resets any previous padding */
+    margin: 0; /* Resets any previous margin */
+}
+
+/* Footer specific styles */
+footer.footer {
+    background-color: #ffffff;
+    color: #212529;
+    width: 100%;
+    border-top: 1px solid #dee2e6;
+    padding: 1rem 0;
+    flex-shrink: 0; /* Prevents footer from shrinking */
+}
+
+footer.footer .container {
+    max-width: 1140px; /* Adjust based on your main container max-width */
+    margin: 0 auto;
+    padding: 0 15px;
+}
+
+footer.footer a,
+footer.footer .btn-social i {
+    color: #212529;
+}
+
+footer.footer .btn-social {
+    background-color: transparent;
+    border: 1px solid #212529;
+}
+
+footer.footer .btn-social:hover {
+    background-color: #212529;
+    color: #ffffff;
+}
+
+/* -------------------------------------------------------------------------- */
+/* GENERIC CONTAINER & FORM STYLES (Used across Login, Order, Payment, etc.)  */
+/* -------------------------------------------------------------------------- */
+.login-container {
+    background-color: white;
+    border-radius: 10px;
+    padding: 30px;
+    min-width: 350px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    width: auto; /* Allows width to adjust based on content and max-width */
+    max-width: 1200px;
+}
+
+@media (max-width: 768px) {
+    .login-container {
+        padding: 20px;
+        max-width: 90%; 
+    }
+}
+
+.form-box {
+    display: flex;
+    flex-direction: column;
+    gap: 20px; /* Consistent gap between elements inside the form box */
+    width: 100%; /* Ensures it takes full width of its parent container */
+    max-width: 100%; 
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+label {
+    text-align: left;
+    font-weight: bold;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="date"],
+input[type="number"],
+select {
+    padding: 10px;
+    height: 40px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 14px;
+    box-sizing: border-box;
+    width: 100%;
+    background-color: white;
+}
+
+button,
+button[type="submit"] {
+    margin-top: 10px;
+    padding: 10px 25px;
+    background: #FFA500;
+    border: none;
+    border-radius: 25px;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+button:hover,
+button[type="submit"]:hover {
+    opacity: 0.9;
+}
+
+.error-message { 
+    color: red;
+    font-size: 0.85rem;
+    margin-top: 5px;
+    text-align: left;
+    min-height: 1em; 
+}
+
+.text-link {
+    text-align: center;
+    margin-top: 15px;
+    font-size: 14px;
+}
+
+.text-link a {
+    color: #a855f7;
+    text-decoration: none;
+}
+
+.text-link a:hover {
+    text-decoration: underline;
+}
+
+/* For Login Result Page (Proceed & Sign Out Buttons side-by-side) */
+.button-group {
+    display: flex;
+    justify-content: center; /* Centers the forms horizontally within this group */
+    gap: 20px; /* Adds space between the buttons */
+    margin-top: 20px; /* Space above the button group */
+    flex-wrap: wrap; /* Allows buttons to wrap to next line on smaller screens */
+}
+
+.form-footer {
+    display: block;
+    text-align: center; /* Centers the button if it doesn't fill the form-footer's width */
+    margin-top: 0;
+}
+
+/* Two-column layout for Signup Form (Registration) */
+.signup-columns {
+    display: flex;
+    flex-direction: row;
+    gap: 30px;
+    margin-bottom: 20px;
+}
+
+.left-column,
+.right-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Responsive adjustment for signup columns */
+@media (max-width: 768px) {
+    .signup-columns {
+        flex-direction: column; /* Stacks columns vertically on small screens */
+    }
+}
+
+/* -------------------------------------------------------------------------- */
+/* ORDER PAGE SPECIFIC STYLES - MODIFIED FOR 2x3 LAYOUT (3 COLUMNS)           */
+/* -------------------------------------------------------------------------- */
+
+/* Grid container for menu items, arranging them in three columns */
+.menu-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr; 
+    gap: 30px;
+}
+
+/* Styles for each individual menu item within the grid */
+.order-item {
+    display: flex;
+    align-items: center; /* Vertically aligns items within each order-item */
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+    box-sizing: border-box; /* Ensures padding/border is included in element's total width/height */
+}
+
+.item-image {
+    flex-shrink: 0; /* Prevents image from shrinking */
+    margin-right: 20px;
+}
+
+.item-image img {
+    width: 100px;
+    height: 100px;
+    object-fit: cover; /* Covers the area, cropping if necessary */
+    border-radius: 5px; /* Slightly rounded corners for images */
+}
+
+.item-details {
+    flex-grow: 1; /* Allows details to take up available space */
+}
+
+.item-details h2 {
+    margin-top: 0;
+    margin-bottom: 5px;
+    font-size: 1.5rem;
+    line-height: normal;
+}
+
+.item-details p {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: normal;
+    color: #555;
+}
+
+.item-quantity {
+    flex-shrink: 0; /* Prevents quantity input from shrinking */
+    width: 80px;
+    text-align: center;
+}
+
+.item-quantity input {
+    padding: 10px;
+    height: 40px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 14px;
+    box-sizing: border-box;
+    width: 100%;
+    background-color: white;
+}
+
+/* Apply bottom border and vertical spacing to items that are in the first row (items 1, 2, 3) */
+/* Items 4, 5, 6 will be in the second row, no bottom border. */
+.menu-grid .order-item:nth-child(1),
+.menu-grid .order-item:nth-child(2),
+.menu-grid .order-item:nth-child(3) {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 20px;
+    margin-bottom: 25px;
+}
+
+/* Ensure items in the second row do NOT have a bottom border */
+.menu-grid .order-item:nth-child(4),
+.menu-grid .order-item:nth-child(5),
+.menu-grid .order-item:nth-child(6) {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+
+/* Centers the "Proceed to Payment" button on the order page */
+.order-form-button {
+    text-align: center;
+    margin-top: 30px;
+}
+
+/* Responsive adjustments for menu grid on smaller screens */
+@media (max-width: 768px) {
+    .menu-grid {
+        grid-template-columns: 1fr; /* Stacks items vertically on small screens */
+        gap: 20px; /* Consistent gap for stacked items */
+    }
+    .menu-grid .order-item {
+        margin-bottom: 25px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #eee; /* Re-adds border for stacked items */
+    }
+    /* Ensures the very last item overall on mobile doesn't have a bottom border */
+    .menu-grid .order-item:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+    .item-image img {
+        width: 100px;
+        height: 100px;
+    }
+}
+
+/* ---------------------------- */
+/* PAYMENT PAGE SPECIFIC STYLES */
+/* ---------------------------- */
+
+/* Container for side-by-side user info and order list */
+.summary-details-wrapper {
+    display: block;
+    margin-bottom: 30px; /* Keep existing margin bottom */
+}
+
+.user-info-section,
+.order-list-section {
+    width: 100%;
+    min-width: auto;
+    margin-bottom: 25px;
+}
+
+.order-list-section:last-of-type {
+    margin-bottom: 0;
+}
+
+
+.summary-details-wrapper h2 {
+    text-align: left; /* Align headings within their sections */
+    margin-top: 0;
+    margin-bottom: 15px; /* Space below the new H2 headings */
+    color: #333; /* Darker color for headings */
+}
+
+/* User Info List */
+.summary-list {
+    list-style: disc;
+    padding-left: 20px;
+    margin-bottom: 0; /* Remove bottom margin as section handles it */
+    font-size: 0.95rem;
+}
+
+.summary-list li {
+    margin-bottom: 5px;
+    line-height: 1.5;
+}
+
+.summary-list strong {
+    display: inline-block;
+    width: 100px; /* Adjusted width to align labels within the narrower column */
+}
+
+/* Order Items List */
+.order-items-list {
+    list-style: disc; /* Uses bullet points for order items */
+    padding-left: 20px; /* Indents the list */
+    margin-top: 0;
+    margin-bottom: 0;
+    font-size: 0.95rem;
+}
+
+.order-items-list li {
+    margin-bottom: 5px;
+}
+
+/* Horizontal line below side-by-side sections */
+.summary-divider {
+    border: 0;
+    height: 1px;
+    background: #eee;
+    margin: 30px auto; /* Centered with vertical margin */
+    width: 80%; /* Adjust width of the line */
+}
+
+/* Container for the total amount, time, date, and place order button */
+.final-summary-section {
+    display: flex;
+    flex-direction: column; /* Stack items vertically */
+    align-items: center; /* Center horizontally within this section */
+    text-align: center; /* Ensures text is centered */
+    width: 100%; /* Takes full width of parent to center content properly */
+    margin-top: 0; 
+}
+
+.final-summary-section p {
+    margin-bottom: 5px; /* Small margin between date/time lines */
+    font-size: 1rem;
+}
+
+.total-amount {
+    font-size: 1.5rem; /* Slightly larger for emphasis */
+    font-weight: bold;
+    margin-top: 15px; /* Spacing after the details */
+    margin-bottom: 15px; /* Space before the button container */
+    padding-top: 0;
+    border-top: none;
+    width: 100%; /* Ensure text is centered within the section */
+    text-align: center; /* Explicitly center text */
+}
+
+
+.payment-button-container {
+    margin-top: 10px; /* Adjusted margin for final button */
+    text-align: center; /* Ensure button is centered if not full width */
+    width: 100%;
+}
+
+
+/* NEW STYLES FOR PAYMENT OPTIONS */
+.payment-options-section {
+    width: 100%;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+    text-align: left; /* Align new section content to the left */
+}
+
+.payment-options-section h2 {
+    text-align: center; /* Center the "Payment Options" heading */
+    margin-bottom: 20px;
+}
+
+.input-group {
+    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px; /* Space between label and input */
+}
+
+.card-details-row {
+    display: flex;
+    gap: 20px; /* Space between expiry and CVV */
+    width: 100%;
+}
+
+.card-details-row > div {
+    flex: 1; /* Makes expiry and CVV sections take equal width */
+}
+
+/* Ensure inputs within the new sections inherit proper width */
+.payment-options-section input[type="text"],
+.payment-options-section select {
+    width: 100%;
+}
+
+/* Styles for payment.php membership design --- */
+
+/* Login-container for the membership page's content */
+.login-container {
+    padding: 40px;
+    max-width: 800px; /* Adjust max-width as needed for membership content */
+    margin: 50px auto; /* Center the container */
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Membership Options Container for the two columns */
+.membership-options-container {
+    display: flex;
+    justify-content: center;
+    gap: 30px; /* Space between columns */
+    margin-top: 20px;
+    margin-bottom: 40px; /* Space before payment options */
+    flex-wrap: wrap; 
+}
+
+/* Individual Membership Plan Box */
+.membership-plan {
+    background-color: #f8f9fa; /* Light background for plans */
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 25px;
+    text-align: center;
+    width: 300px; /* Fixed width for each plan */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    display: flex; /* Use flex for internal layout */
+    flex-direction: column; /* Stack content vertically */
+    justify-content: space-between; /* Push button to bottom */
+}
+
+.membership-plan:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.membership-plan h2 {
+    color: #343a40; /* Darker heading color */
+    margin-bottom: 10px;
+}
+
+.membership-plan p {
+    font-size: 1rem;
+    color: #6c757d; /* Lighter text color */
+    margin-bottom: 5px;
+}
+
+.membership-plan .features {
+    text-align: left;
+    margin-top: 15px;
+    list-style: none; 
+    padding: 0;
+    flex-grow: 1; /* Allow features list to take available space */
+}
+
+.membership-plan .features li {
+    font-size: 0.95rem;
+    color: #495057;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+}
+
+.membership-plan .features li::before {
+    content: '✓'; /* Checkmark for features */
+    color: #28a745; /* Green checkmark */
+    margin-right: 8px;
+    font-weight: bold;
+}
+
+/* Select button styling */
+.membership-plan .select-button {
+    background-color: #cccccc; /* Gray for unselected */
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    margin-top: 20px;
+    transition: background-color 0.3s ease;
+    width: 80%; /* Button width */
+    align-self: center; /* Center the button */
+}
+
+/* Selected button color */
+.membership-plan .select-button.selected {
+    background-color: #ffc800; /* Yellow for selected (adjust to your theme's primary color) */
+    color: #343a40; /* Dark text for selected button */
+    font-weight: bold;
+}
+
+.membership-plan .select-button:not(.selected):hover {
+    background-color: #5a6268; /* Darker gray on hover for unselected */
+}
+
+/* General form and error styles */
+.input-group {
+    margin-bottom: 15px;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #555;
+}
+
+/* Specific styling for the +63 prefix and mobile number input */
+.gcash-mobile-input-group {
+    display: flex;
+    align-items: center;
+    border: 1px solid #ccc; /* Border around the whole flex container */
+    border-radius: 4px;
+    padding: 0; 
+}
+
+.gcash-mobile-input-group span {
+    padding: 10px;
+    background-color: #e9ecef;
+    border-right: 1px solid #ccc;
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+    font-weight: bold;
+    color: #555;
+    white-space: nowrap; /* Prevent +63 from wrapping */
+    height: 40px; /* Match height of input for alignment */
+    display: flex;
+    align-items: center;
+}
+
+.gcash-mobile-input-group input {
+    flex-grow: 1; /* Allow input to take remaining space */
+    border: none; 
+    padding: 10px;
+    height: 40px; /* Explicit height */
+    border-radius: 0 4px 4px 0; /* Only right corners rounded */
+}
+
+.gcash-mobile-input-group input:focus {
+    outline: none; 
+    box-shadow: none;
+}
+
+/* Pay Now button styling */
+.payment-button-container button {
+    background-color: #007bff; /* Blue for Pay Now */
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: background-color 0.3s ease;
+}
+
+.payment-button-container button:hover:not(:disabled) {
+    background-color: #0056b3; /* Darker blue on hover */
+}
+
+.payment-button-container button:disabled {
+    background-color: #cccccc; /* Gray when disabled */
+    cursor: not-allowed;
+}
+
+/* Error message for PHP server side validation */
+.validation-error-message {
+    color: #dc3545;
+    font-size: 1rem;
+    text-align: center;
+    margin-bottom: 20px;
+    font-weight: bold;
+    list-style: none; 
+    padding: 0;
+}
+.validation-error-message li {
+    margin-bottom: 5px;
+}
+
+/* Media query for smaller screens */
+@media (max-width: 768px) {
+    .membership-options-container {
+        flex-direction: column; /* Stack plans vertically on small screens */
+        align-items: center; /* Center the stacked plans */
+        gap: 20px; /* Reduce gap when stacked */
+    }
+
+    .membership-plan {
+        width: 90%; /* Make plans take more width on small screens */
+        max-width: 350px; /* Limit max width even on small screens */
+    }
+
+    .card-details-row {
+        flex-direction: column; /* Stack card details vertically */
+        gap: 15px; /* Space between stacked fields */
+    }
+}
