@@ -28,6 +28,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     $errors = [];
 
+    require_once 'database/locations.php';
+    $province_id = ($province_id === 'NA' || $province_id === '' || $province_id === 'NULL') ? null : $province_id;
+    if (!validLocation($conn, $region_id, $province_id, $city_municipality_id)) {
+        $errors[] = 'Please select a city and province belonging to the selected region.';
+    }
+
     // Basic validation
     if (empty($username) || empty($name) || empty($email) || empty($address) || empty($contact) || empty($dob) || empty($gender) || empty($region_id) || empty($city_municipality_id)) {
         $errors[] = "All required fields must be filled.";
@@ -62,7 +68,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if (empty($errors)) {
         $sql = "UPDATE users SET username = ?, name = ?, email = ?, address = ?, contact = ?, dob = ?, gender = ?, region_id = ?, province_id = ?, city_municipality_id = ?";
-        $params = "ssssssiiii";
+        $params = "sssssssiii";
         $param_values = [$username, $name, $email, $address, $contact, $dob, $gender, $region_id, $province_id, $city_municipality_id];
 
         if (!empty($password)) {

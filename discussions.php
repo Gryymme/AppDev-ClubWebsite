@@ -156,7 +156,7 @@ $sql_threads = "
         t.content,
         t.created_at,
         t.user_id,
-        u.username,
+        u.username, u.name, u.created_at AS user_created_at,
         (SELECT COUNT(*) FROM likes WHERE thread_id = t.id) AS like_count,
         (SELECT COUNT(*) FROM replies WHERE thread_id = t.id) AS reply_count,
         (SELECT COUNT(*) FROM likes WHERE thread_id = t.id AND user_id = ?) AS user_liked
@@ -171,6 +171,9 @@ $threads_stmt->bind_param("i", $current_user_id);
 $threads_stmt->execute();
 $threads_result = $threads_stmt->get_result();
 
+
+// One server-rendered dialog per author, shared by their threads and replies.
+$profileUsers = [];
 
 // NAVIGATION BAR LOGIC
 $membershipLink = 'afterpayment.php';
@@ -298,10 +301,11 @@ $discussionLink = 'discussions.php';
                 <div class="row justify-content-center">
                     <div class="col-lg-8">
                         <?php if ($threads_result->num_rows > 0): ?>
-                            <?php while($thread = $threads_result->fetch_assoc()): ?>
+                            <?php while($thread = $threads_result->fetch_assoc()):
+                                $profileUsers[$thread['user_id']] = $thread; ?>
                                 <div class="post-container" id="thread-<?= $thread['id'] ?>">
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <a href="#" class="username" data-user-id="<?= $thread['user_id'] ?>"><?= htmlspecialchars($thread['username']) ?></a>
+                                        <a href="#userModal<?= (int)$thread['user_id'] ?>" class="username" data-bs-toggle="modal"><?= htmlspecialchars($thread['username']) ?></a>
                                         <div class="post-date"><?= date('F j, Y, g:i a', strtotime($thread['created_at'])) ?></div>
                                     </div>
                                     <div class="post-content">
@@ -330,7 +334,7 @@ $discussionLink = 'discussions.php';
                                         <hr class="my-3">
                                         <?php
                                         $reply_stmt = $conn->prepare("
-                                            SELECT r.id, r.content, r.created_at, r.user_id, u.username,
+                                            SELECT r.id, r.content, r.created_at, r.user_id, u.username, u.name, u.created_at AS user_created_at,
                                             (SELECT COUNT(*) FROM likes WHERE reply_id = r.id) AS like_count,
                                             (SELECT COUNT(*) FROM likes WHERE reply_id = r.id AND user_id = ?) AS user_liked
                                             FROM replies r
@@ -343,10 +347,11 @@ $discussionLink = 'discussions.php';
                                         $replies_result = $reply_stmt->get_result();
                                         
                                         if ($replies_result->num_rows > 0) {
-                                            while($reply = $replies_result->fetch_assoc()): ?>
+                                            while($reply = $replies_result->fetch_assoc()):
+                                                $profileUsers[$reply['user_id']] = $reply; ?>
                                             <div class="reply-container" id="reply-<?= $reply['id'] ?>">
                                                 <div class="d-flex justify-content-between align-items-center">
-                                                    <a href="#" class="username" data-user-id="<?= $reply['user_id'] ?>"><?= htmlspecialchars($reply['username']) ?></a>
+                                                    <a href="#userModal<?= (int)$reply['user_id'] ?>" class="username" data-bs-toggle="modal"><?= htmlspecialchars($reply['username']) ?></a>
                                                     <div class="post-date"><?= date('F j, Y, g:i a', strtotime($reply['created_at'])) ?></div>
                                                 </div>
                                                 <div class="post-content">
@@ -411,20 +416,21 @@ $discussionLink = 'discussions.php';
             </div>
         </footer>
 
-        <div class="modal fade" id="userModal" tabindex="-1" aria-labelledby="userModalLabel" aria-hidden="true">
+        <?php foreach ($profileUsers as $profileId => $profile): ?>
+        <div class="modal fade" id="userModal<?= (int)$profileId ?>" tabindex="-1" aria-labelledby="userModalLabel<?= (int)$profileId ?>" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content text-center">
                     <div class="modal-header border-0">
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body pt-0">
-                        <h5 class="modal-title w-100" id="userModalLabel">About the User</h5>
+                        <h5 class="modal-title w-100" id="userModalLabel<?= (int)$profileId ?>">About the User</h5>
                         <hr>
-                        <p id="modalUserName" class="user-modal-name mb-0">User Name</p>
-                        <p id="modalUserUsername" class="user-modal-username mb-3">@username</p>
+                        <p class="user-modal-name mb-0"><?= htmlspecialchars($profile['name']) ?></p>
+                        <p class="user-modal-username mb-3">@<?= htmlspecialchars($profile['username']) ?></p>
                         <p class="user-modal-member-info mb-0">
                             Has been a member since<br>
-                            <span id="modalUserMemberSince">Membership Date</span>
+                            <span><?= date('F j, Y', strtotime($profile['user_created_at'])) ?></span>
                         </p>
                     </div>
                     <div class="modal-footer border-0 justify-content-center">
@@ -434,6 +440,8 @@ $discussionLink = 'discussions.php';
             </div>
         </div>
 
+
+        <?php endforeach; ?>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
         <script src="js/scripts.js"></script>
@@ -472,43 +480,6 @@ $discussionLink = 'discussions.php';
                 });
             });
 
-            // USER INFO POP-UP
-            const userModalElement = document.getElementById('userModal');
-            const userModal = new bootstrap.Modal(userModalElement);
-            
-            const modalUserName = document.getElementById('modalUserName');
-            const modalUserUsername = document.getElementById('modalUserUsername');
-            const modalUserMemberSince = document.getElementById('modalUserMemberSince');
-
-            document.querySelectorAll('.username').forEach(usernameLink => {
-                usernameLink.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const userId = this.dataset.userId;
-
-                    fetch(`get_user_info.php?user_id=${userId}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                // Populate modal with data
-                                modalUserName.textContent = data.user.name;
-                                modalUserUsername.textContent = `@${data.user.username}`;
-                                const memberDate = new Date(data.user.created_at);
-                                const options = { year: 'numeric', month: 'long', day: 'numeric' };
-                                modalUserMemberSince.textContent = memberDate.toLocaleDateString('en-US', options);
-
-                                // Show the modal using Bootstrap's API
-                                userModal.show();
-                            } else {
-                                alert('Could not retrieve user information.');
-                                console.error('Error:', data.message);
-                            }
-                        })
-                        .catch(error => {
-                            alert('An error occurred while fetching user data.');
-                            console.error('Fetch error:', error);
-                        });
-                });
-            });
         });
         </script>
     </body>

@@ -29,68 +29,16 @@ if ($user_id) {
     $stmt->close();
 }
 
-// Fetch regions for the dropdown
-$regions = [];
-$sql_regions = "SELECT id, region_name, region_code FROM regions ORDER BY region_name ASC";
-$result_regions = $conn->query($sql_regions);
-if ($result_regions->num_rows > 0) {
-    while($row = $result_regions->fetch_assoc()) {
-        $regions[] = $row;
-    }
+require_once 'database/locations.php';
+$regions = $conn->query('SELECT id, region_name, region_code FROM regions ORDER BY region_name ASC')->fetch_all(MYSQLI_ASSOC);
+$regionCode = '';
+foreach ($regions as $region) {
+    if ($region['id'] == ($user_data['region_id'] ?? null)) $regionCode = $region['region_code'];
 }
-
-// Fetch provinces based on user's current region_id, if available
-$provinces = [];
-if (!empty($user_data['region_id'])) {
-    $stmt_provinces = $conn->prepare("SELECT id, province_name FROM provinces WHERE region_id = ? ORDER BY province_name ASC");
-    $stmt_provinces->bind_param("i", $user_data['region_id']);
-    $stmt_provinces->execute();
-    $result_provinces = $stmt_provinces->get_result();
-    if ($result_provinces->num_rows > 0) {
-        while($row = $result_provinces->fetch_assoc()) {
-            $provinces[] = $row;
-        }
-    }
-    $stmt_provinces->close();
-}
-
-// Fetch cities/municipalities based on user's current province_id or region_id (for NCR), if available
-$cities_municipalities_data = []; 
-if (!empty($user_data['province_id'])) {
-    $stmt_cities = $conn->prepare("SELECT id, city_municipality_name FROM cities_municipalities WHERE province_id = ? ORDER BY city_municipality_name ASC");
-    $stmt_cities->bind_param("i", $user_data['province_id']);
-    $stmt_cities->execute();
-    $result_cities = $stmt_cities->get_result();
-    if ($result_cities->num_rows > 0) {
-        while($row = $result_cities->fetch_assoc()) {
-            $cities_municipalities_data[] = $row;
-        }
-    }
-    $stmt_cities->close();
-} else if (!empty($user_data['region_id'])) { // Handle NCR case if province_id is null for NCR
-    // Find region code for the selected region
-    $ncr_region_code = '';
-    foreach($regions as $region) {
-        if ($region['id'] == $user_data['region_id']) {
-            $ncr_region_code = $region['region_code'];
-            break;
-        }
-    }
-
-    if ($ncr_region_code === 'NCR') {
-        $stmt_cities_ncr = $conn->prepare("SELECT id, city_municipality_name FROM cities_municipalities WHERE region_id = ? ORDER BY city_municipality_name ASC");
-        $stmt_cities_ncr->bind_param("i", $user_data['region_id']);
-        $stmt_cities_ncr->execute();
-        $result_cities_ncr = $stmt_cities_ncr->get_result();
-        if ($result_cities_ncr->num_rows > 0) {
-            while($row = $result_cities_ncr->fetch_assoc()) {
-                $cities_municipalities_data[] = $row;
-            }
-        }
-        $stmt_cities_ncr->close();
-    }
-}
-
+$isNcr = $regionCode === 'NCR';
+$provinces = $isNcr ? [] : locationRows($conn, 'provinces', (int)($user_data['region_id'] ?? 0));
+$cities_municipalities_data = locationRows($conn, $isNcr ? 'cities_by_region' : 'cities',
+    (int)($user_data[$isNcr ? 'region_id' : 'province_id'] ?? 0));
 
 $conn->close();
 ?>
@@ -114,7 +62,6 @@ $conn->close();
 
     <link href="css/login_style.css" rel="stylesheet" />
 
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 </head>
 <body>
     <?php include 'navbar.php'; ?>
@@ -154,22 +101,14 @@ $conn->close();
 
                             <label for="province">Province</label>
                             <select name="province_id" id="province" required <?php echo empty($provinces) ? 'disabled' : ''; ?>>
-                                <option value="">Select Province</option>
-                                <?php foreach ($provinces as $province): ?>
-                                    <option value="<?php echo htmlspecialchars($province['id']); ?>" <?php echo (isset($user_data['province_id']) && $user_data['province_id'] == $province['id']) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($province['province_name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
+                                <?php if ($isNcr): ?>
+                                    <option value="NA">Not Applicable</option>
+                                <?php else: renderLocationOptions($provinces, 'provinces', $user_data['province_id'] ?? null); endif; ?>
                             </select>
 
                             <label for="city_municipality">City/Municipality</label>
                             <select name="city_municipality_id" id="city_municipality" required <?php echo empty($cities_municipalities_data) ? 'disabled' : ''; ?>>
-                                <option value="">Select City/Municipality</option>
-                                <?php foreach ($cities_municipalities_data as $city): // Changed variable name here ?>
-                                    <option value="<?php echo htmlspecialchars($city['id']); ?>" <?php echo (isset($user_data['city_municipality_id']) && $user_data['city_municipality_id'] == $city['id']) ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($city['city_municipality_name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
+                                <?php renderLocationOptions($cities_municipalities_data, 'cities', $user_data['city_municipality_id'] ?? null); ?>
                             </select>
 
                         </div>
@@ -212,114 +151,7 @@ $conn->close();
 
     <?php include 'footer.php'; ?>
 
-    <script>
-        $(document).ready(function() {
-            var $regionSelect = $('#region');
-            var $provinceSelect = $('#province');
-            var $cityMunicipalitySelect = $('#city_municipality');
-
-            function resetProvinceAndCity() {
-                $provinceSelect.html('<option value="">Select Province</option>').prop('disabled', true);
-                $cityMunicipalitySelect.html('<option value="">Select City/Municipality</option>').prop('disabled', true);
-            }
-
-            // Function to load provinces
-            function loadProvinces(regionId, selectedProvinceId = null) {
-                if (regionId) {
-                    var regionCode = $regionSelect.find(':selected').data('region-code');
-                    if (regionCode === 'NCR') {
-                        $provinceSelect.html('<option value="NA">Not Applicable</option>').prop('disabled', true);
-                        loadCities(regionId, selectedProvinceId, 'cities_by_region'); // For NCR, pass regionId
-                    } else {
-                        $.ajax({
-                            url: 'database/fetch_locations.php',
-                            type: 'GET',
-                            dataType: 'json',
-                            data: { type: 'provinces', id: regionId },
-                            success: function(provinces) {
-                                $provinceSelect.empty().append('<option value="">Select Province</option>');
-                                $.each(provinces, function(i, province) {
-                                    $provinceSelect.append($('<option>', {
-                                        value: province.id,
-                                        text: province.province_name,
-                                        selected: (selectedProvinceId && selectedProvinceId == province.id)
-                                    }));
-                                });
-                                $provinceSelect.prop('disabled', false);
-                                // If a province was selected, load its cities
-                                if (selectedProvinceId) {
-                                    loadCities(selectedProvinceId, '<?php echo htmlspecialchars($user_data['city_municipality_id'] ?? ''); ?>');
-                                }
-                            },
-                            error: function() {
-                                console.log('Error fetching provinces.');
-                            }
-                        });
-                    }
-                } else {
-                    resetProvinceAndCity();
-                }
-            }
-
-            // Function to load cities/municipalities
-            function loadCities(parentId, selectedCityId = null, type = 'cities') {
-                if (parentId) {
-                    $.ajax({
-                        url: 'database/fetch_locations.php',
-                        type: 'GET',
-                        dataType: 'json',
-                        data: { type: type, id: parentId }, // Use 'cities_by_region' for NCR
-                        success: function(cities) {
-                            $cityMunicipalitySelect.empty().append('<option value="">Select City/Municipality</option>');
-                            $.each(cities, function(i, city) {
-                                $cityMunicipalitySelect.append($('<option>', {
-                                    value: city.id,
-                                    text: city.city_municipality_name,
-                                    selected: (selectedCityId && selectedCityId == city.id)
-                                }));
-                            });
-                            $cityMunicipalitySelect.prop('disabled', false);
-                        },
-                        error: function() {
-                            console.log('Error fetching cities.');
-                        }
-                    });
-                } else {
-                    $cityMunicipalitySelect.html('<option value="">Select City/Municipality</option>').prop('disabled', true);
-                }
-            }
-
-            // Initial load for provinces and cities if user data exists
-            var initialRegionId = '<?php echo htmlspecialchars($user_data['region_id'] ?? ''); ?>';
-            var initialProvinceId = '<?php echo htmlspecialchars($user_data['province_id'] ?? ''); ?>';
-            var initialCityId = '<?php echo htmlspecialchars($user_data['city_municipality_id'] ?? ''); ?>';
-
-            if (initialRegionId) {
-                loadProvinces(initialRegionId, initialProvinceId);
-                // For NCR, if region is selected and no province, load cities by region
-                var initialRegionCode = $regionSelect.find('option:selected').data('region-code');
-                if (initialRegionCode === 'NCR' && !initialProvinceId) {
-                     loadCities(initialRegionId, initialCityId, 'cities_by_region');
-                } else if (initialProvinceId) {
-                    loadCities(initialProvinceId, initialCityId);
-                }
-            }
-
-
-            // Region change event
-            $regionSelect.on('change', function() {
-                var regionId = $(this).val();
-                resetProvinceAndCity();
-                loadProvinces(regionId);
-            });
-
-            // Province change event
-            $provinceSelect.on('change', function() {
-                var provinceId = $(this).val();
-                $cityMunicipalitySelect.html('<option value="">Select City/Municipality</option>').prop('disabled', true);
-                loadCities(provinceId);
-            });
-        });
-    </script>
+    <script src="js/locations.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

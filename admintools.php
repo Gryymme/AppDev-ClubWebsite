@@ -236,12 +236,6 @@ if ($result_users) {
     }
 }
 
-// For JS dropdowns
-$users_for_js = array_map(function($user) {
-    return ['id' => $user['id'], 'username' => $user['username']];
-}, $users);
-
-
 // Fetch all events for 'Manage Events' and the dropdown
 $events = [];
 $sql_events = "SELECT id, title, subtitle, description, event_date, event_time, image_path FROM events ORDER BY event_date ASC";
@@ -263,23 +257,23 @@ if ($result_attendees) {
 }
 
 
-// Fetch regions, provinces, and cities for JavaScript dropdowns
+// Fetch reference data for PHP-rendered location controls
 $all_regions = [];
 $stmt_regions = $conn->query("SELECT id, region_name, region_code FROM regions ORDER BY region_name ASC");
 if ($stmt_regions) {
     while ($row = $stmt_regions->fetch_assoc()) $all_regions[] = $row;
 }
 
-$all_provinces_js = [];
+$all_provinces = [];
 $stmt_provinces = $conn->query("SELECT id, province_name, region_id FROM provinces ORDER BY province_name ASC");
 if ($stmt_provinces) {
-    while ($row = $stmt_provinces->fetch_assoc()) $all_provinces_js[] = $row;
+    while ($row = $stmt_provinces->fetch_assoc()) $all_provinces[] = $row;
 }
 
-$all_cities_municipalities_js = [];
+$all_cities_municipalities = [];
 $stmt_cities = $conn->query("SELECT id, city_municipality_name, province_id, region_id FROM cities_municipalities ORDER BY city_municipality_name ASC");
 if ($stmt_cities) {
-    while ($row = $stmt_cities->fetch_assoc()) $all_cities_municipalities_js[] = $row;
+    while ($row = $stmt_cities->fetch_assoc()) $all_cities_municipalities[] = $row;
 }
 
 $conn->close();
@@ -427,7 +421,7 @@ $conn->close();
                             <td><?php echo htmlspecialchars($attendee['id']); ?></td>
                             <td data-field="user_id"><?php echo htmlspecialchars($attendee['user_id']); ?></td>
                             <td data-field="event_id"><?php echo htmlspecialchars($attendee['event_id']); ?></td>
-                            <td data-field="event_title"><?php echo htmlspecialchars($attendee['event_title']); ?></td>
+                            <td data-field="event_title" data-editable="false"><?php echo htmlspecialchars($attendee['event_title']); ?></td>
                             <td data-field="event_date" data-editable="false"><?php echo htmlspecialchars($attendee['event_date']); ?></td>
                             <td data-field="event_time" data-editable="false"><?php echo htmlspecialchars($attendee['event_time']); ?></td>
                             <td data-field="signup_date" data-editable="false"><?php echo htmlspecialchars($attendee['signup_date']); ?></td>
@@ -440,19 +434,17 @@ $conn->close();
         </div>
     </div>
 
+    <?php include __DIR__ . '/admin/form_templates.php'; ?>
+
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
     <script type="text/javascript" src="js/datatables.min.js"></script>
 
     <script>
     $(document).ready(function() {
-        // DATA FROM PHP
-        const allRegions = <?php echo json_encode($all_regions); ?>;
-        const allProvinces = <?php echo json_encode($all_provinces_js); ?>;
-        const allCitiesMunicipalities = <?php echo json_encode($all_cities_municipalities_js); ?>;
-        const allEvents = <?php echo json_encode($events); ?>;
-        const allUsers = <?php echo json_encode($users_for_js); ?>;
-
+        function cloneTemplate(id) {
+            return document.getElementById(id).content.cloneNode(true);
+        }
 
         // DATATABLE INITIALIZATION 
         var usersTable = $('#usersTable').DataTable({
@@ -490,7 +482,7 @@ $conn->close();
                 $(this).data('original-html', $(this).html());
             });
 
-            row.find('.action-buttons').html('<button type="button" class="btn btn-primary btn-sm save-btn">Save</button> <button type="button" class="btn btn-secondary btn-sm cancel-btn">Cancel</button>');
+            row.find('.action-buttons').empty().append(cloneTemplate('save-buttons'));
 
             row.children('td:not(.action-buttons)').each(function() {
                 const cell = $(this);
@@ -499,41 +491,13 @@ $conn->close();
                 
                 cell.addClass('editable-cell');
                 const originalContent = cell.text();
-                let inputElement;
-
-                switch (field) {
-                    case 'subtitle':
-                    case 'description':
-                        inputElement = `<textarea class="form-control" data-field="${field}">${originalContent}</textarea>`;
-                        break;
-                    case 'event_date':
-                    case 'dob':
-                    case 'membership_start_date':
-                    case 'membership_end_date':
-                        inputElement = `<input type="date" value="${originalContent}" class="form-control" data-field="${field}"/>`;
-                        break;
-                    case 'event_time':
-                        inputElement = `<input type="text" value="${originalContent}" class="form-control" data-field="${field}"/>`;
-                        break;
-                    case 'gender':
-                        inputElement = `<select class="form-control" data-field="${field}"><option value="Male" ${originalContent === 'Male' ? 'selected' : ''}>Male</option><option value="Female" ${originalContent === 'Female' ? 'selected' : ''}>Female</option><option value="Other" ${originalContent === 'Other' ? 'selected' : ''}>Other</option></select>`;
-                        break;
-                    case 'member_status':
-                        inputElement = `<select class="form-control" data-field="${field}"><option value="Active" ${originalContent === 'Active' ? 'selected' : ''}>Active</option><option value="Inactive" ${originalContent === 'Inactive' ? 'selected' : ''}>Inactive</option><option value="Pending" ${originalContent === 'Pending' ? 'selected' : ''}>Pending</option></select>`;
-                        break;
-                    case 'region_id':
-                    case 'province_id':
-                    case 'city_municipality_id':
-                        inputElement = `<select class="form-control" data-field="${field}"></select>`; break;
-                    case 'event_title': // For Manage Attendees table
-                        const originalEventId = row.data('event-id');
-                        let eventOptions = allEvents.map(e => `<option value="${e.id}" ${e.id == originalEventId ? 'selected' : ''}>${e.title}</option>`).join('');
-                        inputElement = `<select class="form-control" data-field="event_id">${eventOptions}</select>`;
-                        break;
-                    default:
-                        inputElement = `<input type="text" value="${originalContent}" class="form-control" data-field="${field}"/>`;
+                cell.empty().append(cloneTemplate('control-' + field));
+                const value = originalContent;
+                const control = cell.find('input, select, textarea');
+                if (control.is('select') && value && !Array.from(control[0].options).some(option => option.value == value)) {
+                    control.append(new Option(value, value));
                 }
-                cell.html(inputElement);
+                control.val(value);
             });
 
             if (row.closest('table').is('#usersTable')) {
@@ -563,7 +527,7 @@ $conn->close();
             row.children('td:not(.action-buttons)').each(function() {
                 $(this).html($(this).data('original-html')).removeClass('editable-cell');
             });
-            row.find('.action-buttons').html('<button type="button" class="btn btn-warning btn-sm edit-btn">Edit</button> <button type="button" class="btn btn-danger btn-sm delete-btn">Delete</button>');
+            row.find('.action-buttons').empty().append(cloneTemplate('edit-buttons'));
         }
         
         // EVENT HANDLERS FOR ALL TABLES
@@ -655,141 +619,66 @@ $conn->close();
             });
         });
 
-        // ADD USER BUTTON
-        $('.add-user-btn').click(function() {
-            var newRow = usersTable.row.add([
-                '<span class="temp-id">NEW</span>',
-                '<td class="editable-cell"><input type="text" class="form-control" data-field="username"></td>',
-                '<td class="editable-cell"><input type="email" class="form-control" data-field="email"></td>',
-                '<td class="editable-cell"><input type="text" class="form-control" data-field="name"></td>',
-                '<td class="editable-cell"><input type="text" class="form-control" data-field="address"></td>',
-                '<td class="editable-cell"><select class="form-control" data-field="region_id"></select></td>',
-                '<td class="editable-cell"><select class="form-control" data-field="province_id"></select></td>',
-                '<td class="editable-cell"><select class="form-control" data-field="city_municipality_id"></select></td>',
-                '<td class="editable-cell"><input type="text" class="form-control" data-field="contact"></td>',
-                '<td class="editable-cell"><input type="date" class="form-control" data-field="dob"></td>',
-                '<td class="editable-cell"><select class="form-control" data-field="gender"><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></td>',
-                '<td class="editable-cell"><select class="form-control" data-field="member_status"><option value="Pending">Pending</option><option value="Active">Active</option><option value="Inactive">Inactive</option></select></td>',
-                '', // Created At (not editable)
-                '<td class="editable-cell"><input type="text" class="form-control" data-field="membership_plan"></td>',
-                '<td class="editable-cell"><input type="text" class="form-control" data-field="membership_amount_paid"></td>',
-                '<td class="editable-cell"><input type="date" class="form-control" data-field="membership_start_date"></td>',
-                '<td class="editable-cell"><input type="date" class="form-control" data-field="membership_end_date"></td>',
-                '<td class="editable-cell"><input type="text" class="form-control" data-field="membership_payment_method"></td>',
-                '<td class="editable-cell"><input type="text" class="form-control" data-field="membership_transaction_id"></td>',
-                '<td class="action-buttons"><button type="button" class="btn btn-primary btn-sm save-btn">Save</button> <button type="button" class="btn btn-secondary btn-sm cancel-btn">Cancel</button></td>'
-            ]).draw(false).node();
-            
-            $(newRow).addClass('new-row-form').find('td').addClass('editable-cell');
-            populateRegions($(newRow).find('select[data-field="region_id"]'));
-        });
-
-        // ADD ATTENDEE BUTTON
-        $('.add-attendee-btn').click(function() {
-            var userOptions = allUsers.map(u => `<option value="${u.id}">${u.username} (ID: ${u.id})</option>`).join('');
-            var eventOptions = allEvents.map(e => `<option value="${e.id}">${e.title}</option>`).join('');
-
-            var newRow = attendeesTable.row.add([
-                '<span class="temp-id">NEW</span>',
-                `<select class="form-control" data-field="user_id"><option value="">Select User</option>${userOptions}</select>`,
-                `<select class="form-control" data-field="event_id"><option value="">Select Event</option>${eventOptions}</select>`,
-                '<span></span><input type="hidden" data-field="event_title" />',
-                '<span></span><input type="hidden" data-field="event_date" />',
-                '<span></span><input type="hidden" data-field="event_time" />',
-                '', 
-                '<button type="button" class="btn btn-primary btn-sm save-btn">Save</button> <button type="button" class="btn btn-secondary btn-sm cancel-btn">Cancel</button>'
-            ]).draw(false).node();
-            
-            $(newRow).addClass('new-row-form');
-            // Add the 'action-buttons' class to the last cell
-            $(newRow).find('td:last-child').addClass('action-buttons');
-        });
-        
-        // Auto-populate event details when adding an attendee
-        $('#attendeesTable tbody').on('change', 'tr.new-row-form select[data-field="event_id"]', function() {
-            var row = $(this).closest('tr');
-            var eventId = $(this).val();
-            var event = allEvents.find(e => e.id == eventId);
-
-            // Find cells by their index in the row
-            var titleCell = row.find('td').eq(3);
-            var dateCell = row.find('td').eq(4);
-            var timeCell = row.find('td').eq(5);
-
-            if (event) {
-                titleCell.find('span').text(event.title);
-                titleCell.find('input').val(event.title);
-
-                dateCell.find('span').text(event.event_date);
-                dateCell.find('input').val(event.event_date);
-
-                timeCell.find('span').text(event.event_time);
-                timeCell.find('input').val(event.event_time);
-            } else {
-                // Clear other values if "Select Event" is chosen
-                titleCell.find('span').text('');
-                titleCell.find('input').val('');
-                dateCell.find('span').text('');
-                dateCell.find('input').val('');
-                timeCell.find('span').text('');
-                timeCell.find('input').val('');
-            }
-        });
-
-
-        // LOCATION DROPDOWN LOGIC
-        function populateRegions(selectElement, selectedRegionId = null) {
-            selectElement.empty().append('<option value="">Select Region</option>');
-            allRegions.forEach(region => {
-                const selectedAttr = (selectedRegionId !== null && region.id == selectedRegionId) ? 'selected' : '';
-                selectElement.append(`<option value="${region.id}" ${selectedAttr}>${region.region_name}</option>`);
+        function addRow(table, templateId) {
+            const row = $(cloneTemplate(templateId)).find('tr');
+            row.find('[data-new-field]').each(function() {
+                if (this.dataset.newField) this.append(cloneTemplate('control-' + this.dataset.newField));
             });
+            row.find('.action-buttons').append(cloneTemplate('save-buttons'));
+            table.row.add(row[0]).draw(false);
+            const index = table.row(row[0]).index();
+            const position = table.rows({ order: 'applied', search: 'applied' }).indexes().toArray().indexOf(index);
+            if (position >= 0) table.page(Math.floor(position / table.page.len())).draw('page');
+            return row;
+        }
+        $('.add-user-btn').click(function() {
+            const row = addRow(usersTable, 'new-user-row');
+            populateRegions(row.find('select[data-field="region_id"]'));
+            populateProvinces(row.find('select[data-field="province_id"]'), null);
+            populateCities(row.find('select[data-field="city_municipality_id"]'), null, null);
+        });
+        $('.add-attendee-btn').click(function() {
+            addRow(attendeesTable, 'new-attendee-row');
+        });
+        $('#attendeesTable tbody').on('change', 'tr.new-row-form select[data-field="event_id"]', function() {
+            const option = this.selectedOptions[0];
+            const row = $(this).closest('tr');
+            row.find('[data-event-detail="title"]').text(this.value ? option.textContent : '');
+            row.find('[data-event-detail="date"]').text(option.dataset.eventDate || '');
+            row.find('[data-event-detail="time"]').text(option.dataset.eventTime || '');
+        });
+
+        // PHP supplies the option markup; the browser filters it immediately.
+        function populateOptions(select, field, predicate, selected) {
+            const control = cloneTemplate('control-' + field).querySelector('select');
+            Array.from(control.options).forEach(option => {
+                if (option.value && !predicate(option)) option.remove();
+            });
+            select.empty().append(Array.from(control.options));
+            select.val(selected == null ? '' : String(selected));
+        }
+        function isNcr(regionId) {
+            const control = document.getElementById('control-region_id').content;
+            return Array.from(control.querySelectorAll('option')).some(option =>
+                option.value == regionId && option.dataset.regionCode === 'NCR');
+        }
+        function populateRegions(select, selected = null) {
+            populateOptions(select, 'region_id', () => true, selected);
+        }
+        function populateProvinces(select, regionId, selected = null) {
+            const ncr = isNcr(regionId);
+            populateOptions(select, 'province_id', option => ncr ? option.value === 'NULL' :
+                option.value !== 'NULL' && option.dataset.regionId == regionId, ncr ? 'NULL' : selected);
+            select.prop('disabled', !regionId || ncr);
+        }
+        function populateCities(select, regionId, provinceId, selected = null) {
+            const ncr = isNcr(regionId);
+            populateOptions(select, 'city_municipality_id', option => ncr ?
+                option.dataset.regionId == regionId && !option.dataset.provinceId :
+                !!provinceId && option.dataset.provinceId == provinceId, selected);
+            select.prop('disabled', !regionId || (!ncr && !provinceId));
         }
 
-        function populateProvinces(selectElement, regionId, selectedProvinceId = null) {
-            selectElement.empty().append('<option value="">Select Province</option>');
-            selectElement.prop('disabled', true);
-            const numericRegionId = parseInt(regionId);
-            const regionObj = allRegions.find(r => r.id == numericRegionId);
-            
-            if (regionObj) {
-                if (regionObj.region_code === "NCR") {
-                    selectElement.append('<option value="NULL" selected>N/A (NCR)</option>');
-                } else {
-                    selectElement.prop('disabled', false);
-                    let filteredProvinces = allProvinces.filter(p => p.region_id == numericRegionId);
-                    filteredProvinces.forEach(function(province) {
-                        const selectedAttr = (selectedProvinceId !== null && province.id == selectedProvinceId) ? 'selected' : '';
-                        selectElement.append(`<option value="${province.id}" ${selectedAttr}>${province.province_name}</option>`);
-                    });
-                }
-            }
-        }
-        
-        function populateCities(selectElement, regionId, provinceId, selectedCityId = null) {
-            selectElement.empty().append('<option value="">Select City/Municipality</option>');
-            selectElement.prop('disabled', true);
-            const numericRegionId = parseInt(regionId);
-            const numericProvinceId = (provinceId === 'NULL' || provinceId === null || provinceId === '') ? null : parseInt(provinceId);
-            const regionObj = allRegions.find(r => r.id == numericRegionId);
-
-            if (regionObj) {
-                let filteredCities = [];
-                if (regionObj.region_code === "NCR") {
-                    selectElement.prop('disabled', false);
-                    filteredCities = allCitiesMunicipalities.filter(c => c.region_id == numericRegionId && c.province_id === null);
-                } else if (numericProvinceId) {
-                    selectElement.prop('disabled', false);
-                    filteredCities = allCitiesMunicipalities.filter(c => c.province_id == numericProvinceId);
-                }
-                
-                filteredCities.forEach(function(city) {
-                    const selectedAttr = (selectedCityId !== null && city.id == selectedCityId) ? 'selected' : '';
-                    selectElement.append(`<option value="${city.id}" ${selectedAttr}>${city.city_municipality_name}</option>`);
-                });
-            }
-        }
-        
         // DELEGATED EVENT HANDLERS FOR DYNAMIC DROPDOWNS
         $('#usersTable tbody').on('change', 'select[data-field="region_id"]', function() {
             const row = $(this).closest('tr');

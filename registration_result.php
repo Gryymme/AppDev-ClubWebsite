@@ -26,6 +26,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $province_id = (int)$province_id;
     }
 
+    require_once 'database/locations.php';
+    if (!validLocation($conn, $region_id, $province_id, $city_municipality_id)) {
+        $errors[] = 'Please select a city and province belonging to the selected region.';
+    }
+
     // Basic Validation (re-validate server-side)
     if (empty($username) || empty($name) || empty($address) || empty($region_id) || empty($city_municipality_id) || empty($email) || empty($contact) || empty($dob) || empty($gender) || empty($password) || empty($confirm_password)) {
         $errors[] = "All fields are required.";

@@ -19,7 +19,6 @@
 
     <link href="css/login_style.css" rel="stylesheet" />
 
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 </head>
 <body>
     <?php include 'navbar.php'; ?>
@@ -109,103 +108,7 @@
 
     <?php include 'footer.php'; ?>
 
-    <script>
-        $(document).ready(function() {
-            // Get references to the dropdowns
-            var $regionSelect = $('#region');
-            var $provinceSelect = $('#province');
-            var $cityMunicipalitySelect = $('#city_municipality');
-
-            // Function to reset province and city dropdowns
-            function resetProvinceAndCity() {
-                $provinceSelect.html('<option value="">Select Province</option>').prop('disabled', true);
-                $cityMunicipalitySelect.html('<option value="">Select City/Municipality</option>').prop('disabled', true);
-            }
-
-            // Region change event
-            $regionSelect.on('change', function() {
-                var regionId = $(this).val();
-                var regionCode = $(this).find(':selected').data('region-code'); // Get the region code
-
-                resetProvinceAndCity(); // Reset dropdowns on new region selection
-
-                if (regionId) {
-                    if (regionCode === 'NCR') {
-                        // Special case for NCR: no provinces, populate cities directly
-                        $provinceSelect.html('<option value="NA">Not Applicable</option>').prop('disabled', true);
-                        
-                        $.ajax({
-                            url: 'database/fetch_locations.php', 
-                            type: 'GET',
-                            dataType: 'json',
-                            data: { type: 'cities_by_region', id: regionId },
-                            success: function(cities) {
-                                $cityMunicipalitySelect.empty().append('<option value="">Select City/Municipality</option>');
-                                $.each(cities, function(i, city) {
-                                    $cityMunicipalitySelect.append($('<option>', {
-                                        value: city.id,
-                                        text: city.city_municipality_name
-                                    }));
-                                });
-                                $cityMunicipalitySelect.prop('disabled', false);
-                            },
-                            error: function() {
-                                console.log('Error fetching NCR cities.');
-                            }
-                        });
-                    } else {
-                        // For other regions, fetch provinces
-                        $.ajax({
-                            url: 'database/fetch_locations.php', 
-                            type: 'GET',
-                            dataType: 'json',
-                            data: { type: 'provinces', id: regionId },
-                            success: function(provinces) {
-                                $provinceSelect.empty().append('<option value="">Select Province</option>');
-                                $.each(provinces, function(i, province) {
-                                    $provinceSelect.append($('<option>', {
-                                        value: province.id,
-                                        text: province.province_name
-                                    }));
-                                });
-                                $provinceSelect.prop('disabled', false);
-                            },
-                            error: function() {
-                                console.log('Error fetching provinces.');
-                            }
-                        });
-                    }
-                }
-            });
-
-            // Province change event
-            $provinceSelect.on('change', function() {
-                var provinceId = $(this).val();
-                $cityMunicipalitySelect.html('<option value="">Select City/Municipality</option>').prop('disabled', true);
-
-                if (provinceId && provinceId !== 'NA') {
-                    $.ajax({
-                        url: 'database/fetch_locations.php', 
-                        type: 'GET',
-                        dataType: 'json',
-                        data: { type: 'cities', id: provinceId },
-                        success: function(cities) {
-                            $cityMunicipalitySelect.empty().append('<option value="">Select City/Municipality</option>');
-                            $.each(cities, function(i, city) {
-                                $cityMunicipalitySelect.append($('<option>', {
-                                    value: city.id,
-                                    text: city.city_municipality_name
-                                }));
-                            });
-                            $cityMunicipalitySelect.prop('disabled', false);
-                        },
-                        error: function() {
-                            console.log('Error fetching cities.');
-                        }
-                    });
-                }
-            });
-        });
-    </script>
+    <script src="js/locations.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
